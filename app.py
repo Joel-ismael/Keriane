@@ -9,14 +9,15 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Fit-Collect Pro", page_icon="🏋️‍♂️", layout="wide")
 
-# --- LISTE DES EXERCICES ---
+# --- LISTE DES EXERCICES (Ajout de 18 exercices + Option Personnalisée) ---
 EXERCICES_LIST = {
-    "Pectoraux": ["Développé couché", "Développé incliné", "Écartés couchés", "Dips", "Pompes", "Chest Press", "Pec Deck"],
-    "Dos": ["Tractions", "Tirage horizontal", "Tirage vertical", "Rowing barre", "Lumberjack", "Deadlift", "Facepull"],
-    "Jambes": ["Squat", "Presse à cuisses", "Fentes", "Leg Extension", "Leg Curl", "Hack Squat", "Mollets debout"],
-    "Épaules": ["Développé militaire", "Élévations latérales", "Oiseau", "Arnold Press", "Shrugs"],
-    "Bras": ["Curl barre", "Hammer Curl", "Extension poulie", "Barre au front", "Curl Larry Scott"],
-    "Abdos": ["Crunch", "Gainage", "Lying Leg Raise", "Russian Twist", "Mountain Climbers"],
+    "Pectoraux": ["Développé couché", "Développé incliné", "Écartés couchés", "Dips", "Pompes", "Chest Press", "Pec Deck", "Pull-over", "Écartés poulie"],
+    "Dos": ["Tractions", "Tirage horizontal", "Tirage vertical", "Rowing barre", "Lumberjack", "Deadlift", "Facepull", "Rowing haltère", "Good Morning"],
+    "Jambes": ["Squat", "Presse à cuisses", "Fentes", "Leg Extension", "Leg Curl", "Hack Squat", "Mollets debout", "Fentes bulgares", "Hip Thrust", "Soulevé de terre jambes tendues"],
+    "Épaules": ["Développé militaire", "Élévations latérales", "Oiseau", "Arnold Press", "Shrugs", "Développé haltères", "Élévations frontales"],
+    "Bras": ["Curl barre", "Hammer Curl", "Extension poulie", "Barre au front", "Curl Larry Scott", "Dips banc", "Kickback haltère", "Curl incliné"],
+    "Abdos": ["Crunch", "Gainage", "Lying Leg Raise", "Russian Twist", "Mountain Climbers", "Relevé de jambes suspendu", "Roulette abdo"],
+    "Cardio & HIIT": ["Burpees", "Jump Squats", "Corde à sauter", "Box Jumps", "Kettlebell Swing", "Battle Rope"],
     "Autre": ["EXERCICE PERSONNALISÉ"]
 }
 
@@ -121,7 +122,6 @@ def main():
 
         elif menu == "Mon Profil":
             st.header("⚙️ Paramètres du Profil")
-            # Modification du profil (Nom, Prénom, Phone, PW)
             with st.form("edit_user"):
                 u_nom = st.text_input("Nom", value=st.session_state.user_info[1])
                 u_pre = st.text_input("Prénom", value=st.session_state.user_info[2])
@@ -143,7 +143,9 @@ def main():
                 with st.form("add_workout"):
                     cat = st.selectbox("Groupe Musculaire", list(EXERCICES_LIST.keys()))
                     ex_choice = st.selectbox("Exercice", EXERCICES_LIST[cat])
-                    custom_ex = st.text_input("Nom personnalisé") if ex_choice == "EXERCICE PERSONNALISÉ" else ""
+                    
+                    # Possibilité de saisir soi-même l'exercice
+                    custom_ex = st.text_input("Nom de l'exercice personnalisé (si non listé)") if ex_choice == "EXERCICE PERSONNALISÉ" else ""
                     final_ex = custom_ex if ex_choice == "EXERCICE PERSONNALISÉ" else ex_choice
                     
                     colA, colB, colC = st.columns(3)
@@ -158,20 +160,30 @@ def main():
                     
                     note = st.text_area("Notes")
                     if st.form_submit_button("Enregistrer"):
-                        vol = ser * rep * pds
-                        c.execute('''INSERT INTO entrainements 
-                                    (user_email, date, exercice, series, reps, poids, repos, intensite, notes, volume) 
-                                    VALUES (?,?,?,?,?,?,?,?,?,?)''',
-                                 (u_email, datetime.now().strftime("%d/%m/%Y %H:%M"), final_ex, ser, rep, pds, repo, intense, note, vol))
-                        conn.commit()
-                        st.success("Séance ajoutée !")
+                        if ex_choice == "EXERCICE PERSONNALISÉ" and not custom_ex:
+                            st.error("Veuillez entrer un nom pour votre exercice personnalisé.")
+                        else:
+                            vol = ser * rep * pds
+                            c.execute('''INSERT INTO entrainements 
+                                        (user_email, date, exercice, series, reps, poids, repos, intensite, notes, volume) 
+                                        VALUES (?,?,?,?,?,?,?,?,?,?)''',
+                                     (u_email, datetime.now().strftime("%d/%m/%Y %H:%M"), final_ex, ser, rep, pds, repo, intense, note, vol))
+                            conn.commit()
+                            st.success("Séance ajoutée !")
 
             with t_analyse:
-                c.execute('SELECT exercice, volume, date FROM entrainements WHERE user_email=?', (u_email,))
+                c.execute('SELECT date, exercice, series, reps, poids, repos, intensite, volume, notes FROM entrainements WHERE user_email=?', (u_email,))
                 data = c.fetchall()
                 if data:
-                    df = pd.DataFrame(data, columns=["Exercice", "Volume", "Date"])
+                    df = pd.DataFrame(data, columns=["Date", "Exercice", "Séries", "Reps", "Poids (kg)", "Repos (s)", "Intensité", "Volume", "Notes"])
+                    
+                    # Graphique
+                    st.subheader("Répartition du Volume")
                     st.plotly_chart(px.pie(df, values='Volume', names='Exercice', hole=0.4), use_container_width=True)
+                    
+                    # TABLEAU DE TOUTES LES DONNÉES SAISIES
+                    st.subheader("Historique Complet des Données")
+                    st.dataframe(df, use_container_width=True)
                 else: st.info("Aucune donnée.")
 
             with t_modif:
@@ -180,11 +192,9 @@ def main():
                 if items:
                     options = {f"ID:{i[0]} | {i[2]} ({i[1]})": i for i in items}
                     sel_key = st.selectbox("Sélectionnez la séance à modifier", list(options.keys()))
-                    curr = options[sel_key] # Données actuelles
+                    curr = options[sel_key]
                     
                     st.write("---")
-                    st.subheader(f"Modification de : {curr[2]}")
-                    
                     with st.form("edit_entry"):
                         col1, col2 = st.columns(2)
                         with col1:
@@ -197,23 +207,19 @@ def main():
                         
                         e_note = st.text_area("Notes", value=curr[8])
                         
-                        col_btn1, col_btn2 = st.columns(2)
-                        with col_btn1:
-                            if st.form_submit_button("💾 Mettre à jour les paramètres"):
-                                new_vol = e_ser * e_rep * e_pds
-                                c.execute('''UPDATE entrainements SET series=?, reps=?, poids=?, repos=?, intensite=?, notes=?, volume=? 
-                                             WHERE id=?''', (e_ser, e_rep, e_pds, e_repo, e_intense, e_note, new_vol, curr[0]))
-                                conn.commit()
-                                st.success("Données mises à jour avec succès !")
-                                st.rerun()
+                        if st.form_submit_button("💾 Mettre à jour"):
+                            new_vol = e_ser * e_rep * e_pds
+                            c.execute('''UPDATE entrainements SET series=?, reps=?, poids=?, repos=?, intensite=?, notes=?, volume=? 
+                                         WHERE id=?''', (e_ser, e_rep, e_pds, e_repo, e_intense, e_note, new_vol, curr[0]))
+                            conn.commit()
+                            st.success("Mise à jour réussie !")
+                            st.rerun()
                     
-                    if st.button("🗑️ Supprimer cette séance définitivement"):
+                    if st.button("🗑️ Supprimer"):
                         c.execute('DELETE FROM entrainements WHERE id=?', (curr[0],))
                         conn.commit()
-                        st.warning("Séance supprimée.")
                         st.rerun()
-                else:
-                    st.info("Aucune séance enregistrée pour le moment.")
+                else: st.info("Aucune séance.")
 
 if __name__ == '__main__':
     main()
