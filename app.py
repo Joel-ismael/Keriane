@@ -9,7 +9,7 @@ import re
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Fit-Collect Pro", page_icon="🏋️‍♂️", layout="wide")
 
-# --- LISTE DES EXERCICES (Ajout de 18 exercices + Option Personnalisée) ---
+# --- LISTE DES EXERCICES (110+ options) ---
 EXERCICES_LIST = {
     "Pectoraux": ["Développé couché", "Développé incliné", "Écartés couchés", "Dips", "Pompes", "Chest Press", "Pec Deck", "Pull-over", "Écartés poulie"],
     "Dos": ["Tractions", "Tirage horizontal", "Tirage vertical", "Rowing barre", "Lumberjack", "Deadlift", "Facepull", "Rowing haltère", "Good Morning"],
@@ -113,7 +113,10 @@ def main():
 
     else:
         u_email = st.session_state.user_info[0]
-        st.sidebar.title(f"💪 {st.session_state.user_info[2]}")
+        # MISE À JOUR DU NOM DANS LA NAVIGATION
+        st.sidebar.title("💪 KERIANE")
+        st.sidebar.caption("Suivi de Performance Sportive (Fit-Collect)")
+        
         menu = st.sidebar.selectbox("Navigation", ["Journal d'entraînement", "Mon Profil", "Déconnexion"])
 
         if menu == "Déconnexion":
@@ -144,7 +147,6 @@ def main():
                     cat = st.selectbox("Groupe Musculaire", list(EXERCICES_LIST.keys()))
                     ex_choice = st.selectbox("Exercice", EXERCICES_LIST[cat])
                     
-                    # Possibilité de saisir soi-même l'exercice
                     custom_ex = st.text_input("Nom de l'exercice personnalisé (si non listé)") if ex_choice == "EXERCICE PERSONNALISÉ" else ""
                     final_ex = custom_ex if ex_choice == "EXERCICE PERSONNALISÉ" else ex_choice
                     
@@ -176,12 +178,8 @@ def main():
                 data = c.fetchall()
                 if data:
                     df = pd.DataFrame(data, columns=["Date", "Exercice", "Séries", "Reps", "Poids (kg)", "Repos (s)", "Intensité", "Volume", "Notes"])
-                    
-                    # Graphique
                     st.subheader("Répartition du Volume")
                     st.plotly_chart(px.pie(df, values='Volume', names='Exercice', hole=0.4), use_container_width=True)
-                    
-                    # TABLEAU DE TOUTES LES DONNÉES SAISIES
                     st.subheader("Historique Complet des Données")
                     st.dataframe(df, use_container_width=True)
                 else: st.info("Aucune donnée.")
